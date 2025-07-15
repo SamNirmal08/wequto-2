@@ -3,6 +3,8 @@ let todos = JSON.parse(localStorage.getItem('serenity-todos')) || [];
 let currentTheme = localStorage.getItem('serenity-theme') || 'sunset';
 let currentCity = localStorage.getItem('serenity-city') || 'Chennai';
 let deferredPrompt = null;
+require('dotenv').config();
+console.log(process.env);
 
 const quotes = [
   { text: "The purpose of our lives is to be happy.", author: "Dalai Lama" },
@@ -111,7 +113,7 @@ async function fetchWeather(city) {
   refreshIcon.classList.add('animate-spin');
 
   try {
-    const apiKey = '9a30181635d142be96b985147632110d'; // Replace with your API key
+    const apiKey = process.env.API_KEY; // Replace with your API key
     const response = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`
     );
