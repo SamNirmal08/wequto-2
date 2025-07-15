@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Serenity Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="#" id="manifest-placeholder">
+  <meta name="theme-color" content="#7b2ff7">
+  <meta name="description" content="Beautiful productivity app with weather forecasts, inspirational quotes, and smart to-do management">
+  
+  <!-- PWA Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Serenity">
+</head>
+<body>
+  <!-- Splash Screen -->
+  <div id="splash-screen">
+    <div class="splash-logo">
+      <span style="font-size: 48px;">🌤️</span>
+    </div>
+    <h1 class="splash-title">Serenity</h1>
+    <p class="splash-subtitle">Your Personal Dashboard</p>
+    <div class="splash-loader"></div>
+  </div>
+
+  <!-- Theme Selector -->
+  <div id="theme-selector" class="theme-selector glass-strong">
+    <h4 style="margin-bottom: 12px; color: #333; font-size: 0.875rem; font-weight: 600;">Themes</h4>
+    <div class="theme-options">
+      <div class="theme-option theme-sunset active" data-theme="sunset">Sunset</div>
+      <div class="theme-option theme-ocean" data-theme="ocean">Ocean</div>
+      <div class="theme-option theme-forest" data-theme="forest">Forest</div>
+      <div class="theme-option theme-galaxy" data-theme="galaxy">Galaxy</div>
+    </div>
+  </div>
+
+  <!-- Install Prompt -->
+  <div id="install-prompt" class="install-prompt glass-strong">
+    <div class="install-content">
+      <div class="install-info">
+        <div class="install-icon">📱</div>
+        <div class="install-text">
+          <h4>Install Serenity</h4>
+          <p>Add to your home screen</p>
+        </div>
+      </div>
+      <div class="install-actions">
+        <button class="btn" onclick="hideInstallPrompt()">Cancel</button>
+        <button class="btn btn-primary" onclick="installApp()">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="main-app" class="hidden">
+    <!-- Header -->
+    <header class="header glass-strong">
+      <div class="header-content">
+        <div class="logo">
+          <div class="logo-icon">🌤️</div>
+          <div class="logo-text">Serenity</div>
+        </div>
+        <div class="header-buttons">
+          <button class="btn" onclick="toggleNotifications()" id="notification-btn">
+            🔔 <span id="notification-count" class="hidden"></span>
+          </button>
+          <button class="btn" onclick="toggleThemeSelector()">🎨</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="container">
+      <!-- Quick Stats -->
+      <div class="stats-grid">
+        <div class="stat-card glass animate-fade-in">
+          <div class="stat-value" style="color: #7b2ff7;" id="weather-stat">--°C</div>
+          <div class="stat-label" id="weather-location">Chennai</div>
+        </div>
+        <div class="stat-card glass animate-fade-in" style="animation-delay: 0.1s;">
+          <div class="stat-value" style="color: #f107a3;" id="pending-stat">0</div>
+          <div class="stat-label">Pending Tasks</div>
+        </div>
+        <div class="stat-card glass animate-fade-in" style="animation-delay: 0.2s;">
+          <div class="stat-value" style="color: #06b6d4;" id="completion-stat">0%</div>
+          <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card glass animate-fade-in" style="animation-delay: 0.3s;">
+          <div class="stat-value" style="color: #10b981;">Daily</div>
+          <div class="stat-label">Inspiration</div>
+        </div>
+      </div>
+
+      <!-- Weather Card -->
+      <div class="card glass-strong animate-fade-in" style="animation-delay: 0.4s;">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon" style="color: #7b2ff7;">🌤️</span>
+            Weather Forecast
+          </div>
+          <button class="btn touch-feedback" onclick="refreshWeather()">
+            <span id="weather-refresh-icon">🔄</span>
+          </button>
+        </div>
+        
+        <select class="weather-select" id="city-select" onchange="updateWeatherLocation()">
+          <option value="">Select Tamil Nadu District...</option>
+          <option value="Chennai">Chennai</option>
+          <option value="Coimbatore">Coimbatore</option>
+          <option value="Madurai">Madurai</option>
+          <option value="Salem">Salem</option>
+          <option value="Tiruchirappalli">Tiruchirappalli</option>
+          <option value="Tirunelveli">Tirunelveli</option>
+          <option value="Vellore">Vellore</option>
+          <option value="Erode">Erode</option>
+          <option value="Dindigul">Dindigul</option>
+          <option value="Thanjavur">Thanjavur</option>
+          <option value="Tiruppur">Tiruppur</option>
+          <option value="Kancheepuram">Kancheepuram</option>
+          <option value="Cuddalore">Cuddalore</option>
+          <option value="Nagapattinam">Nagapattinam</option>
+          <option value="Karur">Karur</option>
+          <option value="Krishnagiri">Krishnagiri</option>
+          <option value="Dharmapuri">Dharmapuri</option>
+          <option value="Namakkal">Namakkal</option>
+          <option value="Sivaganga">Sivaganga</option>
+          <option value="Virudhunagar">Virudhunagar</option>
+          <option value="Pudukkottai">Pudukkottai</option>
+          <option value="Ramanathapuram">Ramanathapuram</option>
+          <option value="Theni">Theni</option>
+          <option value="Tiruvarur">Tiruvarur</option>
+          <option value="Nilgiris">The Nilgiris</option>
+          <option value="Perambalur">Perambalur</option>
+          <option value="Ariyalur">Ariyalur</option>
+          <option value="Kallakurichi">Kallakurichi</option>
+          <option value="Chengalpattu">Chengalpattu</option>
+          <option value="Tenkasi">Tenkasi</option>
+          <option value="Tirupathur">Tirupathur</option>
+          <option value="Ranipet">Ranipet</option>
+          <option value="Mayiladuthurai">Mayiladuthurai</option>
+          <option value="Thoothukudi">Thoothukudi</option>
+          <option value="Kanniyakumari">Kanniyakumari</option>
+          <option value="Thiruvallur">Thiruvallur</option>
+          <option value="Viluppuram">Viluppuram</option>
+          <option value="Tiruvannamalai">Tiruvannamalai</option>
+        </select>
+
+        <div id="weather-loading" class="loading hidden">
+          <div class="loading-spinner"></div>
+          Loading weather data...
+        </div>
+
+        <div id="weather-error" class="text-center hidden" style="padding: 32px; color: #ef4444;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">⚠️</div>
+          <p>Unable to load weather data</p>
+        </div>
+
+        <div id="weather-content" class="weather-display">
+          <div class="weather-icon" id="weather-icon">🌤️</div>
+          <div class="weather-temp" id="weather-temp">28°C</div>
+          <div class="weather-city" id="weather-city">Chennai, Tamil Nadu</div>
+          <div class="weather-details">
+            <div class="weather-detail">
+              <div class="weather-detail-icon">💧</div>
+              <div class="weather-detail-label">Humidity</div>
+              <div class="weather-detail-value" id="weather-humidity">65%</div>
+            </div>
+            <div class="weather-detail">
+              <div class="weather-detail-icon">💨</div>
+              <div class="weather-detail-label">Wind Speed</div>
+              <div class="weather-detail-value" id="weather-wind">12 km/h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quote Card -->
+      <div class="card glass-strong animate-fade-in" style="animation-delay: 0.5s;">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon" style="color: #f107a3;">💬</span>
+            Daily Inspiration
+          </div>
+          <button class="btn touch-feedback" onclick="generateNewQuote()">
+            <span>🔄</span>
+          </button>
+        </div>
+        
+        <div class="quote-text" id="quote-text">
+          "The purpose of our lives is to be happy."
+        </div>
+        <div class="quote-author" id="quote-author">
+          — Dalai Lama
+        </div>
+      </div>
+
+      <!-- Todo Card -->
+      <div class="card glass-strong animate-fade-in" style="animation-delay: 0.6s;">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="card-icon" style="color: #10b981;">✅</span>
+            To-Do List
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.875rem; color: #666; background: #dcfce7; padding: 4px 8px; border-radius: 12px;" id="pending-badge">
+              0 pending
+            </span>
+            <button class="btn touch-feedback" onclick="clearCompleted()" id="clear-btn" style="display: none; color: #ef4444;">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <div class="todo-input-container">
+          <input
+            type="text"
+            class="todo-input"
+            id="todo-input"
+            placeholder="Add a new task..."
+            onkeypress="handleTodoKeypress(event)"
+          >
+          <button class="btn btn-primary touch-feedback" onclick="addTodo()">
+            ➕
+          </button>
+        </div>
+
+        <div class="todo-list" id="todo-list">
+          <!-- Todos will be added here -->
+        </div>
+
+        <div id="empty-todos" class="text-center" style="padding: 32px; color: #666;">
+          No tasks yet. Add something to get started!
+        </div>
+
+        <div id="todo-stats" class="todo-stats hidden">
+          <div style="font-size: 0.875rem; color: #666;">
+            Completed <span style="font-weight: 600; color: #10b981;" id="completed-count">0</span> of
+            <span style="font-weight: 600;" id="total-count">0</span> tasks —
+            <span style="font-weight: 600; color: #7b2ff7;" id="completion-percent">0%</span> done
+          </div>
+          <div class="todo-progress">
+            <div class="todo-progress-bar" id="progress-bar" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Action Button -->
+    <button class="fab touch-feedback" onclick="focusTodoInput()">
+      ➕
+    </button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
