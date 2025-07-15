@@ -113,7 +113,7 @@ async function fetchWeather(city) {
   refreshIcon.classList.add('animate-spin');
 
   try {
-    const apiKey =; // Replace with your API key
+    const apiKey ='9802df5f24558a016628d5e625a40817'; // Replace with your API key
     const response = await fetch(
       `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`
     );
