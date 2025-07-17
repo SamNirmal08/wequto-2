@@ -119,6 +119,17 @@ class ApiClient {
     return this.request('/todos/stats');
   }
 
+  // Task history methods
+  async getTaskHistory(page = 1, limit = 20, period = null) {
+    const params = new URLSearchParams({ page, limit });
+    if (period) params.append('period', period);
+    return this.request(`/todos/history?${params}`);
+  }
+
+  async getTaskHistoryStats() {
+    return this.request('/todos/history/stats');
+  }
+
   // Weather methods
   async getWeather(city) {
     return this.request(`/weather/${encodeURIComponent(city)}`);

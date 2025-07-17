@@ -1,5 +1,5 @@
 const express = require('express');
-const { getUserTodos, addTodo, updateTodo, deleteTodo, generateId } = require('../data/store');
+const { getUserTodos, addTodo, updateTodo, deleteTodo, generateId, getUserTaskHistory, getTaskHistoryStats } = require('../data/store');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -125,6 +125,71 @@ router.get('/stats', authenticateToken, (req, res) => {
   } catch (error) {
     console.error('Get stats error:', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Get task history for user
+router.get('/history', authenticateToken, (req, res) => {
+  try {
+    const { page = 1, limit = 20, period } = req.query;
+    let userHistory = getUserTaskHistory(req.user.id);
+    
+    // Filter by period if specified
+    if (period) {
+      const now = new Date();
+      let filterDate;
+      
+      switch (period) {
+        case 'today':
+          filterDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          filterDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+          break;
+        case 'month':
+          filterDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        default:
+          filterDate = null;
+      }
+      
+      if (filterDate) {
+        userHistory = userHistory.filter(entry => new Date(entry.completedAt) >= filterDate);
+      }
+    }
+    
+    // Sort by completion date (newest first)
+    userHistory.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+    
+    // Pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedHistory = userHistory.slice(startIndex, endIndex);
+    
+    res.json({
+      history: paginatedHistory,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(userHistory.length / limit),
+        totalItems: userHistory.length,
+        hasNext: endIndex < userHistory.length,
+        hasPrev: startIndex > 0
+      }
+    });
+  } catch (error) {
+    console.error('Get history error:', error);
+    res.status(500).json({ error: 'Failed to fetch task history' });
+  }
+});
+
+// Get detailed task history statistics
+router.get('/history/stats', authenticateToken, (req, res) => {
+  try {
+    const stats = getTaskHistoryStats(req.user.id);
+    res.json(stats);
+  } catch (error) {
+    console.error('Get history stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch history statistics' });
   }
 });
 

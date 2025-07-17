@@ -204,6 +204,9 @@
             To-Do List
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn touch-feedback" onclick="showTaskHistory()" title="View task history">
+              📊
+            </button>
             <span style="font-size: 0.875rem; color: #666; background: #dcfce7; padding: 4px 8px; border-radius: 12px;" id="pending-badge">
               0 pending
             </span>
@@ -251,6 +254,62 @@
     <button class="fab touch-feedback" onclick="focusTodoInput()">
       ➕
     </button>
+
+    <!-- Task History Modal -->
+    <div id="history-modal" class="modal hidden">
+      <div class="modal-overlay" onclick="hideTaskHistory()"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Task History</h2>
+          <button class="modal-close" onclick="hideTaskHistory()">✕</button>
+        </div>
+        
+        <!-- History Stats -->
+        <div class="history-stats">
+          <div class="history-stat">
+            <div class="history-stat-value" id="history-total">0</div>
+            <div class="history-stat-label">Total</div>
+          </div>
+          <div class="history-stat">
+            <div class="history-stat-value" id="history-today">0</div>
+            <div class="history-stat-label">Today</div>
+          </div>
+          <div class="history-stat">
+            <div class="history-stat-value" id="history-week">0</div>
+            <div class="history-stat-label">This Week</div>
+          </div>
+          <div class="history-stat">
+            <div class="history-stat-value" id="history-month">0</div>
+            <div class="history-stat-label">This Month</div>
+          </div>
+          <div class="history-stat">
+            <div class="history-stat-value" id="history-avg-time">0m</div>
+            <div class="history-stat-label">Avg Time</div>
+          </div>
+        </div>
+        
+        <!-- History Filters -->
+        <div class="history-filters">
+          <button class="history-filter active" data-period="all" onclick="filterHistory('all')">All</button>
+          <button class="history-filter" data-period="today" onclick="filterHistory('today')">Today</button>
+          <button class="history-filter" data-period="week" onclick="filterHistory('week')">This Week</button>
+          <button class="history-filter" data-period="month" onclick="filterHistory('month')">This Month</button>
+        </div>
+        
+        <!-- History List -->
+        <div class="history-content">
+          <div id="history-list" class="history-list">
+            <!-- History items will be added here -->
+          </div>
+          
+          <div id="empty-history" class="empty-state hidden">
+            <div style="font-size: 3rem; margin-bottom: 16px;">📈</div>
+            <h3>No completed tasks yet</h3>
+            <p>Complete some tasks to see your productivity history here!</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>

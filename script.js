@@ -1,5 +1,6 @@
 // Global Variables
 let todos = JSON.parse(localStorage.getItem('serenity-todos')) || [];
+let taskHistory = JSON.parse(localStorage.getItem('serenity-task-history')) || [];
 let currentTheme = localStorage.getItem('serenity-theme') || 'sunset';
 let currentCity = localStorage.getItem('serenity-city') || 'Chennai';
 let deferredPrompt = null;
@@ -100,6 +101,11 @@ async function syncWithBackend() {
     localStorage.setItem('serenity-todos', JSON.stringify(todos));
     renderTodos();
     updateStats();
+    
+    // Sync task history
+    const historyResponse = await apiClient.getTaskHistory(1, 100);
+    taskHistory = historyResponse.history || [];
+    localStorage.setItem('serenity-task-history', JSON.stringify(taskHistory));
     
     // Sync preferences
     if (currentUser.preferences) {
@@ -282,6 +288,10 @@ function saveTodos() {
   localStorage.setItem('serenity-todos', JSON.stringify(todos));
 }
 
+function saveTaskHistory() {
+  localStorage.setItem('serenity-task-history', JSON.stringify(taskHistory));
+}
+
 function renderTodos() {
   const todoList = document.getElementById('todo-list');
   const emptyTodos = document.getElementById('empty-todos');
@@ -362,6 +372,22 @@ async function toggleTodo(id) {
         await apiClient.updateTodo(id, { completed: newCompleted });
       }
       
+      // If completing a task, add to history
+      if (newCompleted && !todo.completed) {
+        const historyEntry = {
+          id: Date.now() + Math.random(),
+          originalTodoId: todo.id,
+          text: todo.text,
+          priority: todo.priority || 'medium',
+          createdAt: todo.createdAt || new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          timeToComplete: new Date() - new Date(todo.createdAt || new Date()),
+          category: todo.category || 'general'
+        };
+        taskHistory.unshift(historyEntry);
+        saveTaskHistory();
+      }
+      
       todo.completed = newCompleted;
       saveTodos();
       renderTodos();
@@ -411,6 +437,25 @@ async function clearCompleted() {
   const completedTodos = todos.filter(t => t.completed);
   
   try {
+    // Add completed todos to history if not already there
+    completedTodos.forEach(todo => {
+      const existingHistory = taskHistory.find(h => h.originalTodoId === todo.id);
+      if (!existingHistory) {
+        const historyEntry = {
+          id: Date.now() + Math.random(),
+          originalTodoId: todo.id,
+          text: todo.text,
+          priority: todo.priority || 'medium',
+          createdAt: todo.createdAt || new Date().toISOString(),
+          completedAt: todo.updatedAt || new Date().toISOString(),
+          timeToComplete: new Date(todo.updatedAt || new Date()) - new Date(todo.createdAt || new Date()),
+          category: todo.category || 'general'
+        };
+        taskHistory.unshift(historyEntry);
+      }
+    });
+    saveTaskHistory();
+    
     if (currentUser && isOnline) {
       // Delete completed todos via backend
       await Promise.all(
@@ -483,6 +528,170 @@ function updateStats() {
   
   // Update notification count
   updateNotificationCount(pending);
+}
+
+// Task History Functions
+function showTaskHistory() {
+  const modal = document.getElementById('history-modal');
+  modal.classList.remove('hidden');
+  renderTaskHistory();
+  updateHistoryStats();
+}
+
+function hideTaskHistory() {
+  const modal = document.getElementById('history-modal');
+  modal.classList.add('hidden');
+}
+
+function renderTaskHistory(period = 'all') {
+  const historyList = document.getElementById('history-list');
+  const emptyHistory = document.getElementById('empty-history');
+  
+  let filteredHistory = [...taskHistory];
+  
+  // Filter by period
+  if (period !== 'all') {
+    const now = new Date();
+    let filterDate;
+    
+    switch (period) {
+      case 'today':
+        filterDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        filterDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        break;
+      case 'month':
+        filterDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+    }
+    
+    if (filterDate) {
+      filteredHistory = filteredHistory.filter(entry => 
+        new Date(entry.completedAt) >= filterDate
+      );
+    }
+  }
+  
+  if (filteredHistory.length === 0) {
+    historyList.innerHTML = '';
+    emptyHistory.classList.remove('hidden');
+    return;
+  }
+  
+  emptyHistory.classList.add('hidden');
+  
+  // Group by date
+  const groupedHistory = {};
+  filteredHistory.forEach(entry => {
+    const date = new Date(entry.completedAt).toDateString();
+    if (!groupedHistory[date]) {
+      groupedHistory[date] = [];
+    }
+    groupedHistory[date].push(entry);
+  });
+  
+  historyList.innerHTML = Object.entries(groupedHistory)
+    .sort(([a], [b]) => new Date(b) - new Date(a))
+    .map(([date, entries]) => `
+      <div class="history-date-group">
+        <h4 class="history-date">${formatHistoryDate(date)}</h4>
+        ${entries.map(entry => `
+          <div class="history-item">
+            <div class="history-item-content">
+              <div class="history-item-text">${entry.text}</div>
+              <div class="history-item-meta">
+                <span class="history-priority priority-${entry.priority}">${entry.priority}</span>
+                <span class="history-time">${formatTime(entry.completedAt)}</span>
+                <span class="history-duration">${formatDuration(entry.timeToComplete)}</span>
+              </div>
+            </div>
+            <div class="history-item-icon">✅</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+}
+
+function updateHistoryStats() {
+  const today = taskHistory.filter(entry => {
+    const entryDate = new Date(entry.completedAt);
+    const todayDate = new Date();
+    return entryDate.toDateString() === todayDate.toDateString();
+  }).length;
+  
+  const thisWeek = taskHistory.filter(entry => {
+    const entryDate = new Date(entry.completedAt);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return entryDate >= weekAgo;
+  }).length;
+  
+  const thisMonth = taskHistory.filter(entry => {
+    const entryDate = new Date(entry.completedAt);
+    const now = new Date();
+    return entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear();
+  }).length;
+  
+  const avgTime = taskHistory.length > 0 
+    ? taskHistory.reduce((sum, entry) => sum + (entry.timeToComplete || 0), 0) / taskHistory.length 
+    : 0;
+  
+  document.getElementById('history-total').textContent = taskHistory.length;
+  document.getElementById('history-today').textContent = today;
+  document.getElementById('history-week').textContent = thisWeek;
+  document.getElementById('history-month').textContent = thisMonth;
+  document.getElementById('history-avg-time').textContent = formatDuration(avgTime);
+}
+
+function filterHistory(period) {
+  // Update active filter button
+  document.querySelectorAll('.history-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === period);
+  });
+  
+  renderTaskHistory(period);
+}
+
+function formatHistoryDate(dateString) {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today';
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday';
+  } else {
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  }
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function formatDuration(milliseconds) {
+  if (!milliseconds || milliseconds < 0) return '0m';
+  
+  const minutes = Math.floor(milliseconds / (1000 * 60));
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) {
+    return `${days}d ${hours % 24}h`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`;
+  } else {
+    return `${minutes}m`;
+  }
 }
 
 // Notification Functions
