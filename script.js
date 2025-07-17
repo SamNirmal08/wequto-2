@@ -3,6 +3,8 @@ let todos = JSON.parse(localStorage.getItem('serenity-todos')) || [];
 let currentTheme = localStorage.getItem('serenity-theme') || 'sunset';
 let currentCity = localStorage.getItem('serenity-city') || 'Chennai';
 let deferredPrompt = null;
+let currentUser = null;
+let isOnline = navigator.onLine;
 
 
 
@@ -41,6 +43,9 @@ const quotes = [
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
+  // Check authentication status
+  checkAuthStatus();
+  
   // Hide splash screen after 2.5 seconds
   setTimeout(() => {
     document.getElementById('splash-screen').classList.add('hidden');
@@ -64,8 +69,59 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Notification permission
   requestNotificationPermission();
+  
+  // Online/offline status
+  window.addEventListener('online', handleOnlineStatus);
+  window.addEventListener('offline', handleOnlineStatus);
 });
 
+// Authentication Functions
+async function checkAuthStatus() {
+  try {
+    if (apiClient.token) {
+      currentUser = await apiClient.getCurrentUser();
+      await syncWithBackend();
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    // Token might be expired, clear it
+    apiClient.setToken(null);
+    currentUser = null;
+  }
+}
+
+async function syncWithBackend() {
+  if (!currentUser || !isOnline) return;
+  
+  try {
+    // Sync todos
+    const backendTodos = await apiClient.getTodos();
+    todos = backendTodos;
+    localStorage.setItem('serenity-todos', JSON.stringify(todos));
+    renderTodos();
+    updateStats();
+    
+    // Sync preferences
+    if (currentUser.preferences) {
+      currentTheme = currentUser.preferences.theme || 'sunset';
+      currentCity = currentUser.preferences.city || 'Chennai';
+      applyTheme(currentTheme);
+      document.getElementById('city-select').value = currentCity;
+    }
+  } catch (error) {
+    console.error('Sync failed:', error);
+  }
+}
+
+function handleOnlineStatus() {
+  isOnline = navigator.onLine;
+  if (isOnline && currentUser) {
+    syncWithBackend();
+    showToast('Back online - syncing data...', 'success');
+  } else if (!isOnline) {
+    showToast('You are offline - changes will sync when reconnected', 'warning');
+  }
+}
 // Theme Management
 function applyTheme(theme) {
   document.body.className = `theme-${theme}`;
@@ -74,6 +130,11 @@ function applyTheme(theme) {
   });
   currentTheme = theme;
   localStorage.setItem('serenity-theme', theme);
+  
+  // Update user preferences if logged in
+  if (currentUser && isOnline) {
+    apiClient.updatePreferences({ theme }).catch(console.error);
+  }
 }
 
 function toggleThemeSelector() {
@@ -113,25 +174,40 @@ async function fetchWeather(city) {
   refreshIcon.classList.add('animate-spin');
 
   try {
-    const apiKey ='9802df5f24558a016628d5e625a40817'; // Replace with your API key
-    const response = await fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`
-    );
+    let data;
     
-    if (!response.ok) throw new Error('Weather data not available');
-    
-    const data = await response.json();
+    if (currentUser && isOnline) {
+      // Use backend API
+      data = await apiClient.getWeather(city);
+    } else {
+      // Fallback to direct API call
+      const apiKey = '9802df5f24558a016628d5e625a40817';
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`
+      );
+      
+      if (!response.ok) throw new Error('Weather data not available');
+      const rawData = await response.json();
+      
+      data = {
+        city: rawData.name,
+        temperature: Math.round(rawData.main.temp),
+        description: rawData.weather[0].description,
+        humidity: rawData.main.humidity,
+        windSpeed: Math.round(rawData.wind.speed * 3.6)
+      };
+    }
     
     // Update weather display
-    document.getElementById('weather-icon').textContent = getWeatherIcon(data.weather[0].description);
-    document.getElementById('weather-temp').textContent = `${Math.round(data.main.temp)}°C`;
-    document.getElementById('weather-city').textContent = `${data.name}, Tamil Nadu`;
-    document.getElementById('weather-humidity').textContent = `${data.main.humidity}%`;
-    document.getElementById('weather-wind').textContent = `${Math.round(data.wind.speed * 3.6)} km/h`;
+    document.getElementById('weather-icon').textContent = getWeatherIcon(data.description);
+    document.getElementById('weather-temp').textContent = `${data.temperature}°C`;
+    document.getElementById('weather-city').textContent = `${data.city}, Tamil Nadu`;
+    document.getElementById('weather-humidity').textContent = `${data.humidity}%`;
+    document.getElementById('weather-wind').textContent = `${data.windSpeed} km/h`;
     
     // Update stats
-    document.getElementById('weather-stat').textContent = `${Math.round(data.main.temp)}°C`;
-    document.getElementById('weather-location').textContent = data.name;
+    document.getElementById('weather-stat').textContent = `${data.temperature}°C`;
+    document.getElementById('weather-location').textContent = data.city;
     
     content.style.opacity = '1';
     loading.classList.add('hidden');
@@ -160,6 +236,12 @@ function updateWeatherLocation() {
   const select = document.getElementById('city-select');
   currentCity = select.value;
   localStorage.setItem('serenity-city', currentCity);
+  
+  // Update user preferences if logged in
+  if (currentUser && isOnline) {
+    apiClient.updatePreferences({ city: currentCity }).catch(console.error);
+  }
+  
   if (currentCity) {
     fetchWeather(currentCity);
   }
@@ -170,11 +252,29 @@ function refreshWeather() {
 }
 
 // Quote Functions
-function generateNewQuote() {
-  const randomIndex = Math.floor(Math.random() * quotes.length);
-  const quote = quotes[randomIndex];
-  document.getElementById('quote-text').textContent = `"${quote.text}"`;
-  document.getElementById('quote-author').textContent = `— ${quote.author}`;
+async function generateNewQuote() {
+  try {
+    let quote;
+    
+    if (currentUser && isOnline) {
+      // Use backend API
+      quote = await apiClient.getRandomQuote();
+    } else {
+      // Fallback to local quotes
+      const randomIndex = Math.floor(Math.random() * quotes.length);
+      quote = quotes[randomIndex];
+    }
+    
+    document.getElementById('quote-text').textContent = `"${quote.text}"`;
+    document.getElementById('quote-author').textContent = `— ${quote.author}`;
+  } catch (error) {
+    console.error('Failed to fetch quote:', error);
+    // Fallback to local quotes
+    const randomIndex = Math.floor(Math.random() * quotes.length);
+    const quote = quotes[randomIndex];
+    document.getElementById('quote-text').textContent = `"${quote.text}"`;
+    document.getElementById('quote-author').textContent = `— ${quote.author}`;
+  }
 }
 
 // Todo Functions
@@ -205,7 +305,7 @@ function renderTodos() {
   `).join('');
 }
 
-function addTodo() {
+async function addTodo() {
   const input = document.getElementById('todo-input');
   const text = input.value.trim();
   
@@ -218,49 +318,125 @@ function addTodo() {
     createdAt: new Date()
   };
   
-  todos.unshift(todo);
-  saveTodos();
-  renderTodos();
-  updateStats();
-  input.value = '';
-  
-  // Schedule notification (demo: 1 minute)
-  scheduleNotification(todo, 60000);
-  
-  // Show success feedback
-  showToast('Task added successfully!', 'success');
-}
-
-function toggleTodo(id) {
-  const todo = todos.find(t => t.id === id);
-  if (todo) {
-    todo.completed = !todo.completed;
+  try {
+    if (currentUser && isOnline) {
+      // Create via backend
+      const createdTodo = await apiClient.createTodo({ text });
+      todos.unshift(createdTodo);
+    } else {
+      // Create locally
+      todos.unshift(todo);
+    }
+    
     saveTodos();
     renderTodos();
     updateStats();
+    input.value = '';
     
-    if (todo.completed) {
-      showToast('Task completed! 🎉', 'success');
+    // Show success feedback
+    showToast('Task added successfully!', 'success');
+  } catch (error) {
+    console.error('Failed to add todo:', error);
+    showToast('Failed to add task - saved locally', 'warning');
+    
+    // Add locally as fallback
+    todos.unshift(todo);
+    saveTodos();
+    renderTodos();
+    updateStats();
+    input.value = '';
+  }
+  
+  // Schedule notification (demo: 1 minute)
+  scheduleNotification(todo, 60000);
+}
+
+async function toggleTodo(id) {
+  const todo = todos.find(t => t.id === id);
+  if (todo) {
+    const newCompleted = !todo.completed;
+    
+    try {
+      if (currentUser && isOnline) {
+        // Update via backend
+        await apiClient.updateTodo(id, { completed: newCompleted });
+      }
+      
+      todo.completed = newCompleted;
+      saveTodos();
+      renderTodos();
+      updateStats();
+      
+      if (todo.completed) {
+        showToast('Task completed! 🎉', 'success');
+      }
+    } catch (error) {
+      console.error('Failed to update todo:', error);
+      showToast('Update failed - saved locally', 'warning');
+      
+      // Update locally as fallback
+      todo.completed = newCompleted;
+      saveTodos();
+      renderTodos();
+      updateStats();
     }
   }
 }
 
-function deleteTodo(id) {
-  todos = todos.filter(t => t.id !== id);
-  saveTodos();
-  renderTodos();
-  updateStats();
-  showToast('Task deleted', 'info');
+async function deleteTodo(id) {
+  try {
+    if (currentUser && isOnline) {
+      // Delete via backend
+      await apiClient.deleteTodo(id);
+    }
+    
+    todos = todos.filter(t => t.id !== id);
+    saveTodos();
+    renderTodos();
+    updateStats();
+    showToast('Task deleted', 'info');
+  } catch (error) {
+    console.error('Failed to delete todo:', error);
+    showToast('Delete failed - removed locally', 'warning');
+    
+    // Delete locally as fallback
+    todos = todos.filter(t => t.id !== id);
+    saveTodos();
+    renderTodos();
+    updateStats();
+  }
 }
 
-function clearCompleted() {
-  const completedCount = todos.filter(t => t.completed).length;
-  todos = todos.filter(t => !t.completed);
-  saveTodos();
-  renderTodos();
-  updateStats();
-  showToast(`${completedCount} completed tasks cleared`, 'info');
+async function clearCompleted() {
+  const completedTodos = todos.filter(t => t.completed);
+  
+  try {
+    if (currentUser && isOnline) {
+      // Delete completed todos via backend
+      await Promise.all(
+        completedTodos.map(todo => apiClient.deleteTodo(todo.id))
+      );
+    }
+    
+    const completedCount = completedTodos.length;
+    todos = todos.filter(t => !t.completed);
+    saveTodos();
+    renderTodos();
+    updateStats();
+    showToast(`${completedCount} completed tasks cleared`, 'info');
+  } catch (error) {
+    console.error('Failed to clear completed:', error);
+    showToast('Clear failed - removed locally', 'warning');
+    
+    // Clear locally as fallback
+    const completedCount = completedTodos.length;
+    todos = todos.filter(t => !t.completed);
+    saveTodos();
+    renderTodos();
+    updateStats();
+  }
 }
+
 
 function handleTodoKeypress(event) {
   if (event.key === 'Enter') {
